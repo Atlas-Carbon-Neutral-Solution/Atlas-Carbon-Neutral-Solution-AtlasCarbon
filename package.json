@@ -1,0 +1,27 @@
+{
+  "name": "atlas-rilievo-diagnosi-energetica",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Web-app per la raccolta dati di sopralluoghi di diagnosi energetica (UNI CEI EN 16247)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "idb": "^8.0.0",
+    "jszip": "^3.10.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.4.11",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}

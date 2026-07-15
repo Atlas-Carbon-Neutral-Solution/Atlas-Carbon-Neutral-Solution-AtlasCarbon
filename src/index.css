@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f4f6f4;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #0f2418;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Evita lo zoom automatico su iOS quando si mette a fuoco un input:
+   i campi devono avere almeno 16px. */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: 16px;
+}
+
+@layer components {
+  .field-label {
+    @apply block text-sm font-semibold text-atlas-dark mb-1;
+  }
+
+  .field-input {
+    @apply w-full min-h-touch rounded-lg border border-gray-300 bg-white px-3 py-2
+      text-atlas-dark outline-none focus:border-atlas-green focus:ring-2
+      focus:ring-atlas-light/50;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 min-h-touch rounded-lg
+      px-4 py-2 font-semibold transition-colors select-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-atlas-green text-white active:bg-atlas-dark;
+  }
+
+  .btn-secondary {
+    @apply btn bg-white text-atlas-dark border border-atlas-green active:bg-atlas-bg;
+  }
+
+  .btn-danger {
+    @apply btn bg-white text-red-700 border border-red-300 active:bg-red-50;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+}
