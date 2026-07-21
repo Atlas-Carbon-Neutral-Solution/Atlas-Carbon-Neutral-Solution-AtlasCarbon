@@ -16,11 +16,11 @@ function triggerDownload(blob, filename) {
 
 // Esporta l'intero database in un file JSON (foto in base64).
 export async function exportBackup() {
-  const { buildings, appliances, photos } = await getAllData()
+  const { aziende, utenze, vettori, bollette, photos } = await getAllData()
   const photosB64 = await Promise.all(
     photos.map(async (p) => ({
       id: p.id,
-      apparecchioId: p.apparecchioId,
+      utenzaId: p.utenzaId,
       tipo: p.tipo,
       timestamp: p.timestamp,
       dataUrl: await blobToDataURL(p.blob),
@@ -28,11 +28,13 @@ export async function exportBackup() {
   )
 
   const payload = {
-    app: 'atlas-rilievo-diagnosi-energetica',
+    app: 'atlas-diagnosi-energetica',
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    buildings,
-    appliances,
+    aziende,
+    utenze,
+    vettori,
+    bollette,
     photos: photosB64,
   }
 
@@ -42,29 +44,31 @@ export async function exportBackup() {
   const stamp = new Date().toISOString().slice(0, 10)
   triggerDownload(blob, `atlas-backup_${stamp}.json`)
   return {
-    buildings: buildings.length,
-    appliances: appliances.length,
+    aziende: aziende.length,
+    utenze: utenze.length,
     photos: photos.length,
   }
 }
 
 async function parseBackup(text) {
   const data = JSON.parse(text)
-  if (!data || !Array.isArray(data.buildings)) {
+  if (!data || !Array.isArray(data.aziende)) {
     throw new Error('File di backup non valido.')
   }
   const photos = await Promise.all(
     (data.photos || []).map(async (p) => ({
       id: p.id || newId(),
-      apparecchioId: p.apparecchioId,
+      utenzaId: p.utenzaId,
       tipo: p.tipo,
       timestamp: p.timestamp || Date.now(),
       blob: await dataURLToBlob(p.dataUrl),
     })),
   )
   return {
-    buildings: data.buildings || [],
-    appliances: data.appliances || [],
+    aziende: data.aziende || [],
+    utenze: data.utenze || [],
+    vettori: data.vettori || [],
+    bollette: data.bollette || [],
     photos,
   }
 }
@@ -79,8 +83,8 @@ export async function importBackup(file, mode = 'merge') {
     await mergeData(data)
   }
   return {
-    buildings: data.buildings.length,
-    appliances: data.appliances.length,
+    aziende: data.aziende.length,
+    utenze: data.utenze.length,
     photos: data.photos.length,
   }
 }

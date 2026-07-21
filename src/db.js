@@ -1,12 +1,13 @@
 import { openDB } from 'idb'
 
-const DB_NAME = 'atlas-rilievo'
+const DB_NAME = 'atlas-diagnosi'
 const DB_VERSION = 1
 
-// Nomi degli object store.
 export const STORES = {
-  buildings: 'buildings',
-  appliances: 'appliances',
+  aziende: 'aziende',
+  utenze: 'utenze',
+  vettori: 'vettori',
+  bollette: 'bollette',
   photos: 'photos',
 }
 
@@ -16,16 +17,19 @@ function getDB() {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
-        if (!db.objectStoreNames.contains(STORES.buildings)) {
-          db.createObjectStore(STORES.buildings, { keyPath: 'id' })
+        if (!db.objectStoreNames.contains(STORES.aziende)) {
+          db.createObjectStore(STORES.aziende, { keyPath: 'id' })
         }
-        if (!db.objectStoreNames.contains(STORES.appliances)) {
-          const s = db.createObjectStore(STORES.appliances, { keyPath: 'id' })
-          s.createIndex('edificioId', 'edificioId', { unique: false })
-        }
-        if (!db.objectStoreNames.contains(STORES.photos)) {
-          const s = db.createObjectStore(STORES.photos, { keyPath: 'id' })
-          s.createIndex('apparecchioId', 'apparecchioId', { unique: false })
+        for (const [store, index] of [
+          [STORES.utenze, 'aziendaId'],
+          [STORES.vettori, 'aziendaId'],
+          [STORES.bollette, 'aziendaId'],
+          [STORES.photos, 'utenzaId'],
+        ]) {
+          if (!db.objectStoreNames.contains(store)) {
+            const s = db.createObjectStore(store, { keyPath: 'id' })
+            s.createIndex(index, index, { unique: false })
+          }
         }
       },
     })
@@ -41,111 +45,146 @@ export function newId() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Edifici                                                            */
+/* Aziende / Siti                                                     */
 /* ------------------------------------------------------------------ */
 
-export async function getBuildings() {
+export async function getAziende() {
   const db = await getDB()
-  const list = await db.getAll(STORES.buildings)
+  const list = await db.getAll(STORES.aziende)
   return list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
 }
 
-export async function getBuilding(id) {
+export async function getAzienda(id) {
   const db = await getDB()
-  return db.get(STORES.buildings, id)
+  return db.get(STORES.aziende, id)
 }
 
-export async function putBuilding(building) {
+export async function putAzienda(azienda) {
   const db = await getDB()
-  const record = { ...building, updatedAt: Date.now() }
+  const record = { ...azienda, updatedAt: Date.now() }
   if (!record.createdAt) record.createdAt = record.updatedAt
-  await db.put(STORES.buildings, record)
+  await db.put(STORES.aziende, record)
   return record
 }
 
-export async function deleteBuilding(id) {
+export async function deleteAzienda(id) {
   const db = await getDB()
-  // Cancella a cascata gli apparecchi e le relative foto.
-  const appliances = await db.getAllFromIndex(
-    STORES.appliances,
-    'edificioId',
-    id,
-  )
+  const utenze = await db.getAllFromIndex(STORES.utenze, 'aziendaId', id)
   const tx = db.transaction(
-    [STORES.buildings, STORES.appliances, STORES.photos],
+    [
+      STORES.aziende,
+      STORES.utenze,
+      STORES.vettori,
+      STORES.bollette,
+      STORES.photos,
+    ],
     'readwrite',
   )
-  for (const a of appliances) {
-    const photos = await tx
+  for (const u of utenze) {
+    const photoKeys = await tx
       .objectStore(STORES.photos)
-      .index('apparecchioId')
-      .getAllKeys(a.id)
-    for (const pid of photos) {
-      await tx.objectStore(STORES.photos).delete(pid)
-    }
-    await tx.objectStore(STORES.appliances).delete(a.id)
+      .index('utenzaId')
+      .getAllKeys(u.id)
+    for (const pid of photoKeys) await tx.objectStore(STORES.photos).delete(pid)
+    await tx.objectStore(STORES.utenze).delete(u.id)
   }
-  await tx.objectStore(STORES.buildings).delete(id)
+  for (const store of [STORES.vettori, STORES.bollette]) {
+    const keys = await tx
+      .objectStore(store)
+      .index('aziendaId')
+      .getAllKeys(id)
+    for (const k of keys) await tx.objectStore(store).delete(k)
+  }
+  await tx.objectStore(STORES.aziende).delete(id)
   await tx.done
 }
 
 /* ------------------------------------------------------------------ */
-/* Apparecchi                                                         */
+/* Utenze monitorate                                                  */
 /* ------------------------------------------------------------------ */
 
-export async function getAppliances(edificioId) {
+export async function getUtenze(aziendaId) {
   const db = await getDB()
-  const list = await db.getAllFromIndex(
-    STORES.appliances,
-    'edificioId',
-    edificioId,
-  )
+  const list = await db.getAllFromIndex(STORES.utenze, 'aziendaId', aziendaId)
   return list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
 }
 
-export async function getAppliance(id) {
+export async function putUtenza(utenza) {
   const db = await getDB()
-  return db.get(STORES.appliances, id)
-}
-
-export async function putAppliance(appliance) {
-  const db = await getDB()
-  const record = { ...appliance, updatedAt: Date.now() }
+  const record = { ...utenza, updatedAt: Date.now() }
   if (!record.createdAt) record.createdAt = record.updatedAt
-  await db.put(STORES.appliances, record)
+  await db.put(STORES.utenze, record)
   return record
 }
 
-export async function deleteAppliance(id) {
+export async function deleteUtenza(id) {
   const db = await getDB()
-  const tx = db.transaction([STORES.appliances, STORES.photos], 'readwrite')
+  const tx = db.transaction([STORES.utenze, STORES.photos], 'readwrite')
   const photoKeys = await tx
     .objectStore(STORES.photos)
-    .index('apparecchioId')
+    .index('utenzaId')
     .getAllKeys(id)
-  for (const pid of photoKeys) {
-    await tx.objectStore(STORES.photos).delete(pid)
-  }
-  await tx.objectStore(STORES.appliances).delete(id)
+  for (const pid of photoKeys) await tx.objectStore(STORES.photos).delete(pid)
+  await tx.objectStore(STORES.utenze).delete(id)
   await tx.done
 }
 
-export async function countAppliances(edificioId) {
+/* ------------------------------------------------------------------ */
+/* Vettori energetici / consumi                                       */
+/* ------------------------------------------------------------------ */
+
+export async function getVettori(aziendaId) {
   const db = await getDB()
-  return db.countFromIndex(STORES.appliances, 'edificioId', edificioId)
+  const list = await db.getAllFromIndex(STORES.vettori, 'aziendaId', aziendaId)
+  return list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+}
+
+export async function putVettore(vettore) {
+  const db = await getDB()
+  const record = { ...vettore, updatedAt: Date.now() }
+  if (!record.createdAt) record.createdAt = record.updatedAt
+  await db.put(STORES.vettori, record)
+  return record
+}
+
+export async function deleteVettore(id) {
+  const db = await getDB()
+  await db.delete(STORES.vettori, id)
 }
 
 /* ------------------------------------------------------------------ */
-/* Foto                                                               */
+/* Bollette                                                           */
 /* ------------------------------------------------------------------ */
 
-export async function getPhotos(apparecchioId) {
+export async function getBollette(aziendaId) {
   const db = await getDB()
-  const list = await db.getAllFromIndex(
-    STORES.photos,
-    'apparecchioId',
-    apparecchioId,
-  )
+  const list = await db.getAllFromIndex(STORES.bollette, 'aziendaId', aziendaId)
+  return list.sort((a, b) => {
+    if (a.anno !== b.anno) return String(a.anno).localeCompare(String(b.anno))
+    return (Number(a.mese) || 0) - (Number(b.mese) || 0)
+  })
+}
+
+export async function putBolletta(bolletta) {
+  const db = await getDB()
+  const record = { ...bolletta, updatedAt: Date.now() }
+  if (!record.createdAt) record.createdAt = record.updatedAt
+  await db.put(STORES.bollette, record)
+  return record
+}
+
+export async function deleteBolletta(id) {
+  const db = await getDB()
+  await db.delete(STORES.bollette, id)
+}
+
+/* ------------------------------------------------------------------ */
+/* Foto (child di Utenza)                                             */
+/* ------------------------------------------------------------------ */
+
+export async function getPhotos(utenzaId) {
+  const db = await getDB()
+  const list = await db.getAllFromIndex(STORES.photos, 'utenzaId', utenzaId)
   return list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
 }
 
@@ -160,51 +199,50 @@ export async function deletePhoto(id) {
   await db.delete(STORES.photos, id)
 }
 
-export async function countPhotos(apparecchioId, tipo) {
-  const photos = await getPhotos(apparecchioId)
-  if (!tipo) return photos.length
-  return photos.filter((p) => p.tipo === tipo).length
-}
-
 /* ------------------------------------------------------------------ */
-/* Backup completo (per import/export JSON)                           */
+/* Backup completo (import/export JSON)                               */
 /* ------------------------------------------------------------------ */
 
 export async function getAllData() {
   const db = await getDB()
-  const [buildings, appliances, photos] = await Promise.all([
-    db.getAll(STORES.buildings),
-    db.getAll(STORES.appliances),
+  const [aziende, utenze, vettori, bollette, photos] = await Promise.all([
+    db.getAll(STORES.aziende),
+    db.getAll(STORES.utenze),
+    db.getAll(STORES.vettori),
+    db.getAll(STORES.bollette),
     db.getAll(STORES.photos),
   ])
-  return { buildings, appliances, photos }
+  return { aziende, utenze, vettori, bollette, photos }
 }
 
-export async function replaceAllData({ buildings, appliances, photos }) {
+async function writeAll(data, clear) {
   const db = await getDB()
   const tx = db.transaction(
-    [STORES.buildings, STORES.appliances, STORES.photos],
+    [
+      STORES.aziende,
+      STORES.utenze,
+      STORES.vettori,
+      STORES.bollette,
+      STORES.photos,
+    ],
     'readwrite',
   )
-  await tx.objectStore(STORES.buildings).clear()
-  await tx.objectStore(STORES.appliances).clear()
-  await tx.objectStore(STORES.photos).clear()
-  for (const b of buildings || []) await tx.objectStore(STORES.buildings).put(b)
-  for (const a of appliances || [])
-    await tx.objectStore(STORES.appliances).put(a)
-  for (const p of photos || []) await tx.objectStore(STORES.photos).put(p)
+  if (clear) {
+    for (const s of Object.values(STORES)) await tx.objectStore(s).clear()
+  }
+  for (const r of data.aziende || []) await tx.objectStore(STORES.aziende).put(r)
+  for (const r of data.utenze || []) await tx.objectStore(STORES.utenze).put(r)
+  for (const r of data.vettori || []) await tx.objectStore(STORES.vettori).put(r)
+  for (const r of data.bollette || [])
+    await tx.objectStore(STORES.bollette).put(r)
+  for (const r of data.photos || []) await tx.objectStore(STORES.photos).put(r)
   await tx.done
 }
 
-export async function mergeData({ buildings, appliances, photos }) {
-  const db = await getDB()
-  const tx = db.transaction(
-    [STORES.buildings, STORES.appliances, STORES.photos],
-    'readwrite',
-  )
-  for (const b of buildings || []) await tx.objectStore(STORES.buildings).put(b)
-  for (const a of appliances || [])
-    await tx.objectStore(STORES.appliances).put(a)
-  for (const p of photos || []) await tx.objectStore(STORES.photos).put(p)
-  await tx.done
+export async function replaceAllData(data) {
+  await writeAll(data, true)
+}
+
+export async function mergeData(data) {
+  await writeAll(data, false)
 }
