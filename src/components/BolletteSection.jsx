@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NumberField, SelectField, TextField } from './Field'
 import ConfirmDialog from './ConfirmDialog'
 import { MESI, emptyBolletta, labelOf } from '../constants'
 import { getBollette, putBolletta, deleteBolletta, newId } from '../db'
 import { euroPerKwh, formatNumber, formatEuro } from '../utils/calc'
 import { useAutosave } from '../hooks/useAutosave'
+import { estraiBollettaDaPdf } from '../utils/bollettaParser'
+import BollettaImportDialog from './BollettaImportDialog'
 
 function BollettaCard({ bolletta, open, onToggle, onChange, onDelete }) {
   const kwh = Number(bolletta.attivaTot) || 0
@@ -129,6 +131,10 @@ export default function BolletteSection({ aziendaId, annoDefault }) {
   const [bollette, setBollette] = useState([])
   const [openId, setOpenId] = useState(null)
   const [toDelete, setToDelete] = useState(null)
+  const [importState, setImportState] = useState(null) // { record, found, textLength }
+  const [busy, setBusy] = useState(false)
+  const [importError, setImportError] = useState(null)
+  const pdfInput = useRef(null)
   const [, scheduleSave] = useAutosave(async (payload) => {
     await putBolletta(payload)
   })
@@ -165,6 +171,40 @@ export default function BolletteSection({ aziendaId, annoDefault }) {
     await refresh()
   }
 
+  async function handlePdf(e) {
+    const file = e.target.files?.[0]
+    if (pdfInput.current) pdfInput.current.value = ''
+    if (!file) return
+    setBusy(true)
+    setImportError(null)
+    try {
+      const { fields, found, textLength } = await estraiBollettaDaPdf(file)
+      if (textLength === 0) {
+        setImportError(
+          'Il PDF non contiene testo selezionabile (probabile scansione/immagine): estrazione automatica non possibile. Inserisci i dati manualmente.',
+        )
+        return
+      }
+      const record = {
+        ...emptyBolletta(newId(), aziendaId, annoDefault),
+        ...fields,
+      }
+      setImportState({ record, found })
+    } catch (err) {
+      console.error(err)
+      setImportError('Impossibile leggere il PDF.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveImported(record) {
+    await putBolletta(record)
+    setImportState(null)
+    await refresh()
+    setOpenId(record.id)
+  }
+
   const totKwh = bollette.reduce((s, b) => s + (Number(b.attivaTot) || 0), 0)
   const totCosto = bollette.reduce((s, b) => s + (Number(b.costoNetto) || 0), 0)
 
@@ -199,9 +239,36 @@ export default function BolletteSection({ aziendaId, annoDefault }) {
         ))}
       </div>
 
-      <button type="button" className="btn-secondary mt-3 w-full" onClick={add}>
-        + Aggiungi bolletta
-      </button>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" className="btn-secondary" onClick={add}>
+          + Aggiungi
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={busy}
+          onClick={() => pdfInput.current?.click()}
+        >
+          {busy ? 'Leggo il PDF…' : 'Importa da PDF'}
+        </button>
+      </div>
+      <p className="mt-1 text-center text-xs text-gray-500">
+        L'import legge i PDF con testo selezionabile; i dati estratti vanno
+        sempre verificati.
+      </p>
+      <input
+        ref={pdfInput}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={handlePdf}
+      />
+
+      {importError ? (
+        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+          {importError}
+        </p>
+      ) : null}
 
       <ConfirmDialog
         open={!!toDelete}
@@ -212,6 +279,15 @@ export default function BolletteSection({ aziendaId, annoDefault }) {
         onConfirm={confirmDelete}
         onCancel={() => setToDelete(null)}
       />
+
+      {importState ? (
+        <BollettaImportDialog
+          record={importState.record}
+          found={importState.found}
+          onSave={saveImported}
+          onCancel={() => setImportState(null)}
+        />
+      ) : null}
     </div>
   )
 }
