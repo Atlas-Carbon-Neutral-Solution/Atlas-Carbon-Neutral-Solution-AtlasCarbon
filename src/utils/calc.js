@@ -1,28 +1,66 @@
-// Calcolo del consumo stimato annuo di un apparecchio.
-// kWh/anno = potenza kW × quantità × ore/giorno × giorni/anno
-export function consumoAnnuo(app) {
-  if (!app) return 0
-  const potenza = Number(app.potenza) || 0
-  const quantita = Number(app.quantita) || 0
-  const ore = Number(app.orePerGiorno) || 0
-  const giorni = Number(app.giorniPerAnno) || 0
-  const kwh = potenza * quantita * ore * giorni
+import { vettoreDef } from '../constants'
+
+// Consumo elettrico/termico stimato annuo di un'utenza monitorata.
+// kWh/anno = potenza kW × quantità × fattore di carico × ore/giorno × giorni/anno
+export function consumoUtenza(u) {
+  if (!u) return 0
+  const potenza = Number(u.potenza) || 0
+  const quantita = Number(u.quantita) || 0
+  const fc = u.fattoreCarico === '' || u.fattoreCarico == null
+    ? 1
+    : Number(u.fattoreCarico)
+  const ore = Number(u.orePerGiorno) || 0
+  const giorni = Number(u.giorniPerAnno) || 0
+  const kwh = potenza * quantita * (Number.isFinite(fc) ? fc : 1) * ore * giorni
   return Number.isFinite(kwh) ? kwh : 0
 }
 
-// Totale di consumo per una lista di apparecchi.
-export function consumoTotale(appliances) {
-  return (appliances || []).reduce((sum, a) => sum + consumoAnnuo(a), 0)
+export function consumoTotaleUtenze(utenze) {
+  return (utenze || []).reduce((s, u) => s + consumoUtenza(u), 0)
 }
 
-// Percentuale di un apparecchio sul totale dell'edificio.
-export function percentualeSulTotale(app, totale) {
-  const c = consumoAnnuo(app)
+export function percentualeSulTotale(u, totale) {
+  const c = consumoUtenza(u)
   if (!totale) return 0
   return (c / totale) * 100
 }
 
-// Formattazione numerica in stile italiano.
+// tep di un vettore = valore × fattore di conversione
+export function vettoreTep(v) {
+  if (!v) return 0
+  const valore = Number(v.valore) || 0
+  const f = Number(v.fattoreTep)
+  const fattore = Number.isFinite(f) ? f : vettoreDef(v.vettore).fattoreTep
+  return valore * fattore
+}
+
+export function vettoreCosto(v) {
+  if (!v) return 0
+  const valore = Number(v.valore) || 0
+  const prezzo = Number(v.prezzoUnitario) || 0
+  return valore * prezzo
+}
+
+export function tepTotale(vettori) {
+  return (vettori || []).reduce((s, v) => s + vettoreTep(v), 0)
+}
+
+export function costoTotaleVettori(vettori) {
+  return (vettori || []).reduce((s, v) => s + vettoreCosto(v), 0)
+}
+
+// €/kWh medio di una bolletta (costo netto / energia attiva totale)
+export function euroPerKwh(b) {
+  const kwh = Number(b.attivaTot) || 0
+  const costo = Number(b.costoNetto) || 0
+  if (!kwh) return 0
+  return costo / kwh
+}
+
+/* ------------------------------------------------------------------ */
+/* Formattazione (stile italiano)                                     */
+/* ------------------------------------------------------------------ */
+
 export function formatNumber(value, decimals = 0) {
   const n = Number(value) || 0
   return n.toLocaleString('it-IT', {
@@ -35,4 +73,17 @@ export function formatKWh(value) {
   const n = Number(value) || 0
   if (n >= 1_000_000) return formatNumber(n / 1000, 0) + ' MWh'
   return formatNumber(n, 0) + ' kWh'
+}
+
+export function formatTep(value) {
+  return formatNumber(value, 2) + ' tep'
+}
+
+export function formatEuro(value) {
+  const n = Number(value) || 0
+  return n.toLocaleString('it-IT', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  })
 }

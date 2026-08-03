@@ -2,17 +2,23 @@ import { useEffect, useRef, useState } from 'react'
 import Header from './Header'
 import ConfirmDialog from './ConfirmDialog'
 import {
-  getBuildings,
-  getAppliances,
-  putBuilding,
-  deleteBuilding,
+  getAziende,
+  getUtenze,
+  getVettori,
+  putAzienda,
+  deleteAzienda,
   newId,
 } from '../db'
-import { emptyBuilding, DESTINAZIONI, labelOf } from '../constants'
-import { consumoTotale, formatKWh } from '../utils/calc'
+import { emptyAzienda } from '../constants'
+import {
+  consumoTotaleUtenze,
+  tepTotale,
+  formatKWh,
+  formatTep,
+} from '../utils/calc'
 import { exportBackup, importBackup } from '../utils/backup'
 
-function BuildingCard({ building, stats, onOpen, onDelete }) {
+function AziendaCard({ azienda, stats, onOpen, onDelete }) {
   return (
     <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
       <button
@@ -23,27 +29,29 @@ function BuildingCard({ building, stats, onOpen, onDelete }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="truncate text-base font-bold text-atlas-dark">
-              {building.nome || '(edificio senza nome)'}
+              {azienda.ragioneSociale || '(azienda senza nome)'}
             </h3>
             <p className="truncate text-sm text-gray-500">
-              {building.indirizzo || 'Indirizzo non indicato'}
+              {azienda.indirizzo || 'Indirizzo non indicato'}
             </p>
           </div>
-          <span className="badge bg-atlas-light/30 text-atlas-dark">
-            {labelOf(DESTINAZIONI, building.destinazione)}
-          </span>
+          {azienda.ateco ? (
+            <span className="badge bg-atlas-light/30 text-atlas-dark">
+              ATECO {azienda.ateco}
+            </span>
+          ) : null}
         </div>
 
         <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
           <span className="text-gray-600">
             <strong className="text-atlas-dark">{stats.count}</strong>{' '}
-            {stats.count === 1 ? 'apparecchio' : 'apparecchi'}
+            {stats.count === 1 ? 'utenza' : 'utenze'}
           </span>
           <span className="text-gray-600">
-            Consumo stimato:{' '}
-            <strong className="text-atlas-green">
-              {formatKWh(stats.totale)}
-            </strong>
+            <strong className="text-atlas-green">{formatKWh(stats.ee)}</strong>
+            {stats.tep > 0 ? (
+              <span className="text-gray-500"> · {formatTep(stats.tep)}</span>
+            ) : null}
           </span>
         </div>
       </button>
@@ -68,22 +76,32 @@ function BuildingCard({ building, stats, onOpen, onDelete }) {
   )
 }
 
-export default function BuildingList({ onOpenBuilding }) {
-  const [buildings, setBuildings] = useState([])
-  const [stats, setStats] = useState({}) // id -> { count, totale }
+export default function AziendaList({ onOpenAzienda }) {
+  const [aziende, setAziende] = useState([])
+  const [stats, setStats] = useState({})
   const [loading, setLoading] = useState(true)
   const [toDelete, setToDelete] = useState(null)
-  const [importMode, setImportMode] = useState(null) // pending file+choice
+  const [importFile, setImportFile] = useState(null)
   const [banner, setBanner] = useState(null)
   const importInput = useRef(null)
 
   async function refresh() {
-    const list = await getBuildings()
-    setBuildings(list)
+    const list = await getAziende()
+    setAziende(list)
     const entries = await Promise.all(
-      list.map(async (b) => {
-        const apps = await getAppliances(b.id)
-        return [b.id, { count: apps.length, totale: consumoTotale(apps) }]
+      list.map(async (a) => {
+        const [utenze, vettori] = await Promise.all([
+          getUtenze(a.id),
+          getVettori(a.id),
+        ])
+        return [
+          a.id,
+          {
+            count: utenze.length,
+            ee: consumoTotaleUtenze(utenze),
+            tep: tepTotale(vettori),
+          },
+        ]
       }),
     )
     setStats(Object.fromEntries(entries))
@@ -94,16 +112,16 @@ export default function BuildingList({ onOpenBuilding }) {
     refresh()
   }, [])
 
-  async function createBuilding() {
-    const b = emptyBuilding(newId())
-    b.nome = 'Nuovo edificio'
-    await putBuilding(b)
-    onOpenBuilding(b.id)
+  async function createAzienda() {
+    const a = emptyAzienda(newId())
+    a.ragioneSociale = 'Nuova azienda'
+    await putAzienda(a)
+    onOpenAzienda(a.id)
   }
 
   async function confirmDelete() {
     if (!toDelete) return
-    await deleteBuilding(toDelete.id)
+    await deleteAzienda(toDelete.id)
     setToDelete(null)
     await refresh()
   }
@@ -112,7 +130,7 @@ export default function BuildingList({ onOpenBuilding }) {
     try {
       const res = await exportBackup()
       showBanner(
-        `Backup esportato: ${res.buildings} edifici, ${res.appliances} apparecchi, ${res.photos} foto.`,
+        `Backup esportato: ${res.aziende} aziende, ${res.utenze} utenze, ${res.photos} foto.`,
       )
     } catch (e) {
       console.error(e)
@@ -122,19 +140,19 @@ export default function BuildingList({ onOpenBuilding }) {
 
   function onImportFileSelected(e) {
     const file = e.target.files?.[0]
-    if (file) setImportMode({ file })
+    if (file) setImportFile(file)
     if (importInput.current) importInput.current.value = ''
   }
 
   async function runImport(mode) {
-    const file = importMode?.file
-    setImportMode(null)
+    const file = importFile
+    setImportFile(null)
     if (!file) return
     try {
       const res = await importBackup(file, mode)
       await refresh()
       showBanner(
-        `Backup importato: ${res.buildings} edifici, ${res.appliances} apparecchi, ${res.photos} foto.`,
+        `Backup importato: ${res.aziende} aziende, ${res.utenze} utenze, ${res.photos} foto.`,
       )
     } catch (e) {
       console.error(e)
@@ -165,36 +183,34 @@ export default function BuildingList({ onOpenBuilding }) {
         ) : null}
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-atlas-dark">Edifici</h2>
+          <h2 className="text-lg font-bold text-atlas-dark">Aziende / Siti</h2>
           <span className="text-sm text-gray-500">
-            {buildings.length}{' '}
-            {buildings.length === 1 ? 'edificio' : 'edifici'}
+            {aziende.length} {aziende.length === 1 ? 'sito' : 'siti'}
           </span>
         </div>
 
         {loading ? (
           <p className="py-8 text-center text-gray-500">Caricamento…</p>
-        ) : buildings.length === 0 ? (
+        ) : aziende.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-10 text-center">
             <p className="text-gray-600">
-              Nessun edificio. Crea il primo rilievo con il pulsante in basso.
+              Nessun sito. Crea il primo rilievo con il pulsante in basso.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {buildings.map((b) => (
-              <BuildingCard
-                key={b.id}
-                building={b}
-                stats={stats[b.id] || { count: 0, totale: 0 }}
-                onOpen={() => onOpenBuilding(b.id)}
-                onDelete={() => setToDelete(b)}
+            {aziende.map((a) => (
+              <AziendaCard
+                key={a.id}
+                azienda={a}
+                stats={stats[a.id] || { count: 0, ee: 0, tep: 0 }}
+                onOpen={() => onOpenAzienda(a.id)}
+                onDelete={() => setToDelete(a)}
               />
             ))}
           </div>
         )}
 
-        {/* Backup / trasferimento dati */}
         <section className="mt-6 rounded-2xl bg-white p-4 shadow-sm">
           <h2 className="mb-1 text-base font-bold text-atlas-dark">
             Backup e trasferimento dati
@@ -231,11 +247,7 @@ export default function BuildingList({ onOpenBuilding }) {
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <div className="mx-auto max-w-3xl">
-          <button
-            type="button"
-            className="btn-primary w-full"
-            onClick={createBuilding}
-          >
+          <button type="button" className="btn-primary w-full" onClick={createAzienda}>
             <svg
               width="20"
               height="20"
@@ -247,16 +259,16 @@ export default function BuildingList({ onOpenBuilding }) {
             >
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Nuovo edificio
+            Nuovo sito
           </button>
         </div>
       </div>
 
       <ConfirmDialog
         open={!!toDelete}
-        title="Eliminare l’edificio?"
-        message={`Verranno eliminati anche tutti gli apparecchi e le foto di "${
-          toDelete?.nome || 'edificio'
+        title="Eliminare il sito?"
+        message={`Verranno eliminate anche tutte le utenze, i consumi, le bollette e le foto di "${
+          toDelete?.ragioneSociale || 'azienda'
         }". Operazione non reversibile.`}
         confirmLabel="Elimina"
         danger
@@ -264,12 +276,12 @@ export default function BuildingList({ onOpenBuilding }) {
         onCancel={() => setToDelete(null)}
       />
 
-      {importMode ? (
+      {importFile ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center"
           role="dialog"
           aria-modal="true"
-          onClick={() => setImportMode(null)}
+          onClick={() => setImportFile(null)}
         >
           <div
             className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
@@ -301,7 +313,7 @@ export default function BuildingList({ onOpenBuilding }) {
               <button
                 type="button"
                 className="btn-secondary w-full"
-                onClick={() => setImportMode(null)}
+                onClick={() => setImportFile(null)}
               >
                 Annulla
               </button>

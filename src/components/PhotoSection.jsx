@@ -55,7 +55,7 @@ function PhotoThumb({ photo, onDelete }) {
   )
 }
 
-export default function PhotoSection({ apparecchioId, onCountChange }) {
+export default function PhotoSection({ utenzaId, onCountChange }) {
   const [photos, setPhotos] = useState([])
   const [tipo, setTipo] = useState('targa')
   const [busy, setBusy] = useState(false)
@@ -63,7 +63,7 @@ export default function PhotoSection({ apparecchioId, onCountChange }) {
   const inputRef = useRef(null)
 
   async function refresh() {
-    const list = await getPhotos(apparecchioId)
+    const list = await getPhotos(utenzaId)
     setPhotos(list)
     if (onCountChange) onCountChange(list)
   }
@@ -71,7 +71,7 @@ export default function PhotoSection({ apparecchioId, onCountChange }) {
   useEffect(() => {
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apparecchioId])
+  }, [utenzaId])
 
   async function handleFiles(fileList) {
     const files = Array.from(fileList || [])
@@ -83,7 +83,7 @@ export default function PhotoSection({ apparecchioId, onCountChange }) {
         const blob = await compressImage(file)
         await putPhoto({
           id: newId(),
-          apparecchioId,
+          utenzaId,
           blob,
           tipo,
           timestamp: Date.now(),

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
-import BuildingList from './components/BuildingList'
-import BuildingDetail from './components/BuildingDetail'
+import AziendaList from './components/AziendaList'
+import AziendaDetail from './components/AziendaDetail'
 
 // Navigazione basata su hash, così il tasto "indietro" del browser/telefono
 // funziona come atteso anche in modalità PWA.
 function parseHash() {
   const h = window.location.hash.replace(/^#/, '')
-  const m = h.match(/^\/edificio\/(.+)$/)
-  if (m) return { view: 'building', buildingId: m[1] }
+  const m = h.match(/^\/azienda\/(.+)$/)
+  if (m) return { view: 'azienda', aziendaId: m[1] }
   return { view: 'list' }
 }
 
@@ -20,23 +20,23 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  function openBuilding(id) {
-    window.location.hash = `/edificio/${id}`
+  function openAzienda(id) {
+    window.location.hash = `/azienda/${id}`
   }
 
   function goHome() {
     window.location.hash = ''
   }
 
-  if (route.view === 'building') {
+  if (route.view === 'azienda') {
     return (
-      <BuildingDetail
-        key={route.buildingId}
-        buildingId={route.buildingId}
+      <AziendaDetail
+        key={route.aziendaId}
+        aziendaId={route.aziendaId}
         onBack={goHome}
       />
     )
   }
 
-  return <BuildingList onOpenBuilding={openBuilding} />
+  return <AziendaList onOpenAzienda={openAzienda} />
 }

@@ -3,55 +3,51 @@ import Header from './Header'
 import PhotoSection from './PhotoSection'
 import ConfirmDialog from './ConfirmDialog'
 import { TextField, NumberField, SelectField, TextAreaField } from './Field'
-import { CATEGORIE, STATI } from '../constants'
-import { putAppliance, deleteAppliance } from '../db'
+import { AREE, CATEGORIE, STATI, TIPOLOGIE, TIPI_MISURA } from '../constants'
+import { putUtenza, deleteUtenza } from '../db'
 import { useAutosave } from '../hooks/useAutosave'
-import { validateAppliance } from '../utils/validate'
-import { consumoAnnuo, formatKWh } from '../utils/calc'
+import { validateUtenza } from '../utils/validate'
+import { consumoUtenza, formatKWh } from '../utils/calc'
 
-export default function ApplianceForm({ initial, isNew, onClose }) {
-  const [appliance, setAppliance] = useState(initial)
+export default function UtenzaForm({ initial, isNew, onClose }) {
+  const [utenza, setUtenza] = useState(initial)
   const [photoCount, setPhotoCount] = useState({ total: 0, targa: 0 })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const persisted = useRef(!isNew)
 
   const [saveState, scheduleSave, saveNow] = useAutosave(async (payload) => {
-    await putAppliance(payload)
+    await putUtenza(payload)
     persisted.current = true
   })
 
-  // Per un nuovo apparecchio crea subito il record, così è possibile
-  // acquisire foto immediatamente (flusso "foto della targa" in campo).
   useEffect(() => {
     if (isNew && !persisted.current) {
-      putAppliance(initial).then(() => {
+      putUtenza(initial).then(() => {
         persisted.current = true
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const errors = validateAppliance(appliance)
+  const errors = validateUtenza(utenza)
 
   function update(patch) {
-    const next = { ...appliance, ...patch }
-    setAppliance(next)
+    const next = { ...utenza, ...patch }
+    setUtenza(next)
     scheduleSave(next)
   }
 
   async function handleBack() {
     await saveNow()
-    // Se è un nuovo apparecchio rimasto completamente vuoto, rimuovilo
-    // per non lasciare righe fantasma nell'elenco.
     const empty =
       isNew &&
-      !appliance.nome?.trim() &&
-      !appliance.marca?.trim() &&
-      !appliance.modello?.trim() &&
-      !appliance.potenza &&
+      !utenza.denominazione?.trim() &&
+      !utenza.marca?.trim() &&
+      !utenza.modello?.trim() &&
+      !utenza.potenza &&
       photoCount.total === 0
     if (empty) {
-      await deleteAppliance(appliance.id)
+      await deleteUtenza(utenza.id)
       onClose({ deleted: true })
       return
     }
@@ -59,19 +55,19 @@ export default function ApplianceForm({ initial, isNew, onClose }) {
   }
 
   async function handleDelete() {
-    await deleteAppliance(appliance.id)
+    await deleteUtenza(utenza.id)
     setConfirmDelete(false)
     onClose({ deleted: true })
   }
 
-  const consumo = consumoAnnuo(appliance)
+  const consumo = consumoUtenza(utenza)
 
   return (
     <div className="min-h-screen bg-atlas-bg">
       <Header
         saveState={saveState}
         onBack={handleBack}
-        subtitle={isNew ? 'Nuovo apparecchio' : 'Modifica apparecchio'}
+        subtitle={isNew ? 'Nuova utenza' : 'Modifica utenza'}
       />
 
       <main className="mx-auto max-w-3xl px-3 py-4 pb-28">
@@ -79,42 +75,54 @@ export default function ApplianceForm({ initial, isNew, onClose }) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <TextField
-                label="Nome / identificativo"
-                value={appliance.nome}
-                onChange={(v) => update({ nome: v })}
-                placeholder="Es. Plafoniera corridoio piano 1"
+                label="Denominazione utenza"
+                value={utenza.denominazione}
+                onChange={(v) => update({ denominazione: v })}
+                placeholder="Es. Compressore aria sala 2"
                 required
-                error={errors.nome}
+                error={errors.denominazione}
               />
             </div>
 
             <SelectField
+              label="Area / destinazione"
+              value={utenza.area}
+              onChange={(v) => update({ area: v })}
+              options={AREE}
+            />
+            <SelectField
+              label="Tipologia vettore"
+              value={utenza.tipologia}
+              onChange={(v) => update({ tipologia: v })}
+              options={TIPOLOGIE}
+            />
+            <SelectField
               label="Categoria"
-              value={appliance.categoria}
+              value={utenza.categoria}
               onChange={(v) => update({ categoria: v })}
               options={CATEGORIE}
             />
             <SelectField
               label="Stato"
-              value={appliance.stato}
+              value={utenza.stato}
               onChange={(v) => update({ stato: v })}
               options={STATI}
             />
 
             <TextField
               label="Marca"
-              value={appliance.marca}
+              value={utenza.marca}
               onChange={(v) => update({ marca: v })}
             />
             <TextField
               label="Modello"
-              value={appliance.modello}
+              value={utenza.modello}
               onChange={(v) => update({ modello: v })}
             />
 
             <NumberField
               label="Potenza nominale (kW)"
-              value={appliance.potenza}
+              value={utenza.potenza}
               onChange={(v) => update({ potenza: v })}
               placeholder="0,00"
               required
@@ -122,40 +130,60 @@ export default function ApplianceForm({ initial, isNew, onClose }) {
             />
             <NumberField
               label="Quantità"
-              value={appliance.quantita}
+              value={utenza.quantita}
               onChange={(v) => update({ quantita: v })}
               required
               error={errors.quantita}
             />
 
             <NumberField
+              label="Fattore di carico (0–1)"
+              value={utenza.fattoreCarico}
+              onChange={(v) => update({ fattoreCarico: v })}
+              placeholder="Es. 0,6"
+              error={errors.fattoreCarico}
+              hint="Quota di potenza mediamente assorbita"
+            />
+            <NumberField
+              label="Rendimento (0–1)"
+              value={utenza.rendimento}
+              onChange={(v) => update({ rendimento: v })}
+              placeholder="Es. 0,95"
+              error={errors.rendimento}
+            />
+
+            <NumberField
               label="Ore funzionamento/giorno"
-              value={appliance.orePerGiorno}
+              value={utenza.orePerGiorno}
               onChange={(v) => update({ orePerGiorno: v })}
               placeholder="0–24"
               error={errors.orePerGiorno}
             />
             <NumberField
               label="Giorni/anno"
-              value={appliance.giorniPerAnno}
+              value={utenza.giorniPerAnno}
               onChange={(v) => update({ giorniPerAnno: v })}
               placeholder="0–365"
               error={errors.giorniPerAnno}
             />
 
-            <div className="sm:col-span-2">
-              <TextField
-                label="Ubicazione (piano/locale)"
-                value={appliance.ubicazione}
-                onChange={(v) => update({ ubicazione: v })}
-                placeholder="Es. Piano 1 — Locale tecnico"
-              />
-            </div>
+            <SelectField
+              label="Tipo di misura"
+              value={utenza.tipoMisura}
+              onChange={(v) => update({ tipoMisura: v })}
+              options={TIPI_MISURA}
+            />
+            <TextField
+              label="Ubicazione (reparto/locale)"
+              value={utenza.ubicazione}
+              onChange={(v) => update({ ubicazione: v })}
+              placeholder="Es. Reparto stampaggio"
+            />
 
             <div className="sm:col-span-2">
               <TextAreaField
                 label="Note"
-                value={appliance.note}
+                value={utenza.note}
                 onChange={(v) => update({ note: v })}
               />
             </div>
@@ -171,7 +199,7 @@ export default function ApplianceForm({ initial, isNew, onClose }) {
               </span>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              potenza × quantità × ore/giorno × giorni/anno
+              potenza × quantità × fattore di carico × ore/giorno × giorni/anno
             </p>
           </div>
         </section>
@@ -181,7 +209,7 @@ export default function ApplianceForm({ initial, isNew, onClose }) {
             Foto ({photoCount.total})
           </h2>
           <PhotoSection
-            apparecchioId={appliance.id}
+            utenzaId={utenza.id}
             onCountChange={(list) =>
               setPhotoCount({
                 total: list.length,
@@ -197,7 +225,7 @@ export default function ApplianceForm({ initial, isNew, onClose }) {
             className="btn-danger mt-4 w-full"
             onClick={() => setConfirmDelete(true)}
           >
-            Elimina apparecchio
+            Elimina utenza
           </button>
         ) : null}
       </main>
@@ -207,11 +235,7 @@ export default function ApplianceForm({ initial, isNew, onClose }) {
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <div className="mx-auto max-w-3xl">
-          <button
-            type="button"
-            className="btn-primary w-full"
-            onClick={handleBack}
-          >
+          <button type="button" className="btn-primary w-full" onClick={handleBack}>
             Fine
           </button>
         </div>
@@ -219,7 +243,7 @@ export default function ApplianceForm({ initial, isNew, onClose }) {
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Eliminare l'apparecchio?"
+        title="Eliminare l'utenza?"
         message="Verranno eliminate anche le foto associate. Operazione non reversibile."
         confirmLabel="Elimina"
         danger
