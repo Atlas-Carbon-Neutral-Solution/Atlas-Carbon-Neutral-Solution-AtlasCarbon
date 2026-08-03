@@ -1,11 +1,12 @@
 import { openDB } from 'idb'
 
 const DB_NAME = 'atlas-diagnosi'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 export const STORES = {
   aziende: 'aziende',
   utenze: 'utenze',
+  automezzi: 'automezzi',
   vettori: 'vettori',
   bollette: 'bollette',
   photos: 'photos',
@@ -13,26 +14,39 @@ export const STORES = {
 
 let dbPromise = null
 
+const upgrade = (db) => {
+  if (!db.objectStoreNames.contains(STORES.aziende)) {
+    db.createObjectStore(STORES.aziende, { keyPath: 'id' })
+  }
+  for (const [store, index] of [
+    [STORES.utenze, 'aziendaId'],
+    [STORES.automezzi, 'aziendaId'],
+    [STORES.vettori, 'aziendaId'],
+    [STORES.bollette, 'aziendaId'],
+    [STORES.photos, 'utenzaId'],
+  ]) {
+    if (!db.objectStoreNames.contains(store)) {
+      const s = db.createObjectStore(store, { keyPath: 'id' })
+      s.createIndex(index, index, { unique: false })
+    }
+  }
+}
+
+async function openDatabase() {
+  try {
+    return await openDB(DB_NAME, DB_VERSION, { upgrade })
+  } catch (e) {
+    // IndexedDB non disponibile (es. iframe con storage bloccato):
+    // fallback in memoria, così l'app resta comunque utilizzabile.
+    console.warn('IndexedDB non disponibile, uso archivio in memoria.', e)
+    await import('fake-indexeddb/auto')
+    return openDB(DB_NAME, DB_VERSION, { upgrade })
+  }
+}
+
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORES.aziende)) {
-          db.createObjectStore(STORES.aziende, { keyPath: 'id' })
-        }
-        for (const [store, index] of [
-          [STORES.utenze, 'aziendaId'],
-          [STORES.vettori, 'aziendaId'],
-          [STORES.bollette, 'aziendaId'],
-          [STORES.photos, 'utenzaId'],
-        ]) {
-          if (!db.objectStoreNames.contains(store)) {
-            const s = db.createObjectStore(store, { keyPath: 'id' })
-            s.createIndex(index, index, { unique: false })
-          }
-        }
-      },
-    })
+    dbPromise = openDatabase()
   }
   return dbPromise
 }
@@ -74,6 +88,7 @@ export async function deleteAzienda(id) {
     [
       STORES.aziende,
       STORES.utenze,
+      STORES.automezzi,
       STORES.vettori,
       STORES.bollette,
       STORES.photos,
@@ -88,7 +103,7 @@ export async function deleteAzienda(id) {
     for (const pid of photoKeys) await tx.objectStore(STORES.photos).delete(pid)
     await tx.objectStore(STORES.utenze).delete(u.id)
   }
-  for (const store of [STORES.vettori, STORES.bollette]) {
+  for (const store of [STORES.automezzi, STORES.vettori, STORES.bollette]) {
     const keys = await tx
       .objectStore(store)
       .index('aziendaId')
@@ -127,6 +142,29 @@ export async function deleteUtenza(id) {
   for (const pid of photoKeys) await tx.objectStore(STORES.photos).delete(pid)
   await tx.objectStore(STORES.utenze).delete(id)
   await tx.done
+}
+
+/* ------------------------------------------------------------------ */
+/* Automezzi aziendali                                                */
+/* ------------------------------------------------------------------ */
+
+export async function getAutomezzi(aziendaId) {
+  const db = await getDB()
+  const list = await db.getAllFromIndex(STORES.automezzi, 'aziendaId', aziendaId)
+  return list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+}
+
+export async function putAutomezzo(automezzo) {
+  const db = await getDB()
+  const record = { ...automezzo, updatedAt: Date.now() }
+  if (!record.createdAt) record.createdAt = record.updatedAt
+  await db.put(STORES.automezzi, record)
+  return record
+}
+
+export async function deleteAutomezzo(id) {
+  const db = await getDB()
+  await db.delete(STORES.automezzi, id)
 }
 
 /* ------------------------------------------------------------------ */
@@ -205,14 +243,16 @@ export async function deletePhoto(id) {
 
 export async function getAllData() {
   const db = await getDB()
-  const [aziende, utenze, vettori, bollette, photos] = await Promise.all([
-    db.getAll(STORES.aziende),
-    db.getAll(STORES.utenze),
-    db.getAll(STORES.vettori),
-    db.getAll(STORES.bollette),
-    db.getAll(STORES.photos),
-  ])
-  return { aziende, utenze, vettori, bollette, photos }
+  const [aziende, utenze, automezzi, vettori, bollette, photos] =
+    await Promise.all([
+      db.getAll(STORES.aziende),
+      db.getAll(STORES.utenze),
+      db.getAll(STORES.automezzi),
+      db.getAll(STORES.vettori),
+      db.getAll(STORES.bollette),
+      db.getAll(STORES.photos),
+    ])
+  return { aziende, utenze, automezzi, vettori, bollette, photos }
 }
 
 async function writeAll(data, clear) {
@@ -221,6 +261,7 @@ async function writeAll(data, clear) {
     [
       STORES.aziende,
       STORES.utenze,
+      STORES.automezzi,
       STORES.vettori,
       STORES.bollette,
       STORES.photos,
@@ -232,6 +273,8 @@ async function writeAll(data, clear) {
   }
   for (const r of data.aziende || []) await tx.objectStore(STORES.aziende).put(r)
   for (const r of data.utenze || []) await tx.objectStore(STORES.utenze).put(r)
+  for (const r of data.automezzi || [])
+    await tx.objectStore(STORES.automezzi).put(r)
   for (const r of data.vettori || []) await tx.objectStore(STORES.vettori).put(r)
   for (const r of data.bollette || [])
     await tx.objectStore(STORES.bollette).put(r)

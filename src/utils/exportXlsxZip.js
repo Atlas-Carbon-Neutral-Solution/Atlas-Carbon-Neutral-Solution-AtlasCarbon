@@ -1,10 +1,18 @@
-import { getUtenze, getVettori, getBollette, getPhotos } from '../db'
+import {
+  getUtenze,
+  getAutomezzi,
+  getVettori,
+  getBollette,
+  getPhotos,
+} from '../db'
 import {
   AREE,
   CATEGORIE,
   STATI,
   TIPOLOGIE,
   TIPI_MISURA,
+  TIPI_MEZZO,
+  ALIMENTAZIONI,
   MESI,
   VETTORI,
   labelOf,
@@ -15,6 +23,8 @@ import {
   percentualeSulTotale,
   vettoreTep,
   vettoreCosto,
+  automezzoTep,
+  automezzoCosto,
   euroPerKwh,
 } from './calc'
 
@@ -39,8 +49,9 @@ function triggerDownload(blob, filename) {
 // Genera il file .xlsx con fogli Azienda / Utenze / Vettori / Bollette.
 export async function exportXlsx(azienda) {
   const XLSX = await import('xlsx')
-  const [utenze, vettori, bollette] = await Promise.all([
+  const [utenze, automezzi, vettori, bollette] = await Promise.all([
     getUtenze(azienda.id),
+    getAutomezzi(azienda.id),
     getVettori(azienda.id),
     getBollette(azienda.id),
   ])
@@ -110,6 +121,38 @@ export async function exportXlsx(azienda) {
     ])
   }
 
+  /* --- Foglio Automezzi --- */
+  const automezziRows = [
+    [
+      'Identificativo / targa',
+      'Tipo mezzo',
+      'Alimentazione',
+      'Consumo annuo',
+      'u.m.',
+      'km/anno',
+      'Fattore conversione (tep/u.m.)',
+      'Consumo (tep)',
+      'Prezzo unitario (€/u.m.)',
+      'Costo (€)',
+      'Note',
+    ],
+  ]
+  for (const m of automezzi) {
+    automezziRows.push([
+      m.identificativo || '',
+      labelOf(TIPI_MEZZO, m.tipoMezzo),
+      labelOf(ALIMENTAZIONI, m.alimentazione),
+      Number(m.consumo) || 0,
+      m.um || '',
+      Number(m.kmAnno) || 0,
+      Number(m.fattoreTep) || 0,
+      Number(automezzoTep(m).toFixed(3)),
+      Number(m.prezzoUnitario) || 0,
+      Math.round(automezzoCosto(m)),
+      m.note || '',
+    ])
+  }
+
   /* --- Foglio Vettori / Consumi --- */
   const vettoriRows = [
     [
@@ -175,11 +218,16 @@ export async function exportXlsx(azienda) {
     XLSX.utils.book_append_sheet(wb, ws, name)
   }
   add(aziendaRows, 'Azienda', [{ wch: 38 }, { wch: 40 }])
-  add(utenzeRows, 'Utenze', [
+  add(utenzeRows, 'Apparecchi', [
     { wch: 26 }, { wch: 18 }, { wch: 20 }, { wch: 12 }, { wch: 14 },
     { wch: 14 }, { wch: 16 }, { wch: 9 }, { wch: 14 }, { wch: 11 },
     { wch: 10 }, { wch: 11 }, { wch: 18 }, { wch: 18 }, { wch: 13 },
     { wch: 20 }, { wch: 11 }, { wch: 28 },
+  ])
+  add(automezziRows, 'Automezzi', [
+    { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 8 },
+    { wch: 10 }, { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 12 },
+    { wch: 28 },
   ])
   add(vettoriRows, 'Vettori', [
     { wch: 22 }, { wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 14 },

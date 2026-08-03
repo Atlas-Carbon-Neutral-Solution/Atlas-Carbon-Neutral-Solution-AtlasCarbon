@@ -34,13 +34,17 @@ Monitorate, Consumi per vettore, Bollette):
 - **Azienda / Sito** (livello principale): ragione sociale, indirizzo,
   P.IVA, codice ATECO, settore, anno di riferimento, superficie, prezzi dei
   vettori energetici (€/kWh, €/Smc, €/litro), note.
-  - **Utenza monitorata** (child): denominazione, area (attività
+  - **Apparecchio** (child): denominazione, area (attività
     principali / servizi ausiliari / servizi generali), categoria, tipologia
     (elettrica/termica), marca, modello, **potenza nominale kW**, quantità,
     **fattore di carico**, **rendimento**, ore/giorno, giorni/anno, **tipo di
     misura** (continuo/spot/calcolo), ubicazione, stato, note.
     - **Foto** (child): blob immagine, tipo (targa dati / contesto),
       timestamp.
+  - **Automezzo** (child): identificativo/targa, tipo mezzo (pala,
+    escavatore, autocarro, dumper, muletto, macchina operatrice…),
+    alimentazione (gasolio/benzina/GPL/metano/elettrico), consumo annuo,
+    km/anno, fattore di conversione in **tep**, prezzo unitario.
   - **Vettore / Consumo** (child): vettore energetico, valore, u.m., fattore
     di conversione in **tep**, prezzo unitario. Consumo in tep e costo €
     calcolati automaticamente.
@@ -53,28 +57,36 @@ Monitorate, Consumi per vettore, Bollette):
 1. **Elenco siti** in home con card (ragione sociale, indirizzo, ATECO,
    n° utenze, consumo elettrico stimato e tep totale) + creazione / modifica /
    eliminazione.
-2. **Dettaglio azienda** a schede: **Anagrafica**, **Utenze**, **Consumi**
-   (vettori), **Bollette**. Riepilogo in testa con n° utenze, consumo
-   elettrico stimato e tep totali.
-3. **Utenze monitorate**: tabella ordinabile per consumo stimato, con totale
-   e percentuale di ciascuna utenza. Consumo annuo calcolato:
+2. **Dettaglio azienda** a schede: **Anagrafica**, **Apparecchi**,
+   **Automezzi**, **Consumi** (vettori), **Bollette**. Riepilogo in testa con
+   n° apparecchi, consumo elettrico stimato e tep totali.
+3. **Apparecchi**: tabella ordinabile per consumo stimato, con totale
+   e percentuale di ciascun apparecchio. Consumo annuo calcolato:
    `kWh/anno = potenza × quantità × fattore di carico × ore/giorno ×
    giorni/anno`.
-4. **Form utenza** con sezione foto: `capture="environment"` per la
+4. **Automezzi aziendali**: mezzi a carburante/elettrici con consumo annuo,
+   conversione in **tep** e costo.
+5. **Form apparecchio** con sezione foto: `capture="environment"` per la
    fotocamera, upload multiplo, anteprime a griglia, eliminazione singola.
    Immagini **compresse lato client** (max 1600px, JPEG q=0.8).
-5. **Vettori energetici**: consumi annui per vettore con **conversione
+6. **Vettori energetici**: consumi annui per vettore con **conversione
    automatica in tep** e valorizzazione economica.
-6. **Bollette elettriche mensili** con dettaglio fasce F1/F2/F3, reattiva,
+7. **Bollette elettriche mensili** con dettaglio fasce F1/F2/F3, reattiva,
    costi e €/kWh medio.
-7. **Export per azienda**: file `.xlsx` con fogli *Azienda*, *Utenze*,
-   *Vettori*, *Bollette* + archivio `.zip` con le foto rinominate
+8. **Export per azienda**: file `.xlsx` con fogli *Azienda*, *Apparecchi*,
+   *Automezzi*, *Vettori*, *Bollette* + archivio `.zip` con le foto rinominate
    `[Denominazione]_[targa|contesto]_[n].jpg`.
-8. **Backup**: export/import dell'intero database in **JSON** (foto in
+9. **Backup**: export/import dell'intero database in **JSON** (foto in
    base64), in modalità *unisci* o *sostituisci*.
-9. **Validazioni** (potenza > 0, quantità ≥ 1, fattore di carico e rendimento
-   0–1, ore/giorno ≤ 24, giorni/anno ≤ 365) e avviso **non bloccante** se
-   un'utenza è priva della foto della targa dati.
+10. **Validazioni** (potenza > 0, quantità ≥ 1, fattore di carico e rendimento
+    0–1, ore/giorno ≤ 24, giorni/anno ≤ 365) e avviso **non bloccante** se
+    un apparecchio è privo della foto della targa dati.
+
+## Build artefatto (single-file)
+
+`npm run build:artifact` produce `dist-artifact/atlas-app.html`, una singola
+pagina autonoma (CSS/JS inline, senza service worker, con fallback storage in
+memoria) pubblicabile come Artifact.
 
 ## Note d'uso
 

@@ -29,12 +29,14 @@ import {
 } from '../utils/calc'
 import { exportXlsx, exportPhotosZip } from '../utils/exportXlsxZip'
 import UtenzaForm from './UtenzaForm'
+import AutomezziSection from './AutomezziSection'
 import VettoriSection from './VettoriSection'
 import BolletteSection from './BolletteSection'
 
 const TABS = [
   { key: 'anagrafica', label: 'Anagrafica' },
-  { key: 'utenze', label: 'Utenze' },
+  { key: 'utenze', label: 'Apparecchi' },
+  { key: 'automezzi', label: 'Automezzi' },
   { key: 'vettori', label: 'Consumi' },
   { key: 'bollette', label: 'Bollette' },
 ]
@@ -232,7 +234,7 @@ export default function AziendaDetail({ aziendaId, onBack }) {
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-atlas-light">
-              Utenze
+              Apparecchi
             </p>
             <p className="text-xl font-bold">{utenze.length}</p>
           </div>
@@ -253,13 +255,13 @@ export default function AziendaDetail({ aziendaId, onBack }) {
 
       {/* Tab bar */}
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-3xl">
+        <div className="mx-auto flex max-w-3xl overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
-              className={`min-h-touch flex-1 border-b-2 px-2 py-2 text-sm font-semibold ${
+              className={`min-h-touch flex-1 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${
                 tab === t.key
                   ? 'border-atlas-green text-atlas-green'
                   : 'border-transparent text-gray-500'
@@ -369,7 +371,7 @@ export default function AziendaDetail({ aziendaId, onBack }) {
           <section className="rounded-2xl bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
               <h2 className="text-base font-bold text-atlas-dark">
-                Utenze monitorate
+                Apparecchi
               </h2>
               <button
                 type="button"
@@ -409,7 +411,9 @@ export default function AziendaDetail({ aziendaId, onBack }) {
                 </svg>
                 <span>
                   {senzaTarga}{' '}
-                  {senzaTarga === 1 ? 'utenza è priva' : 'utenze sono prive'}{' '}
+                  {senzaTarga === 1
+                    ? 'apparecchio è privo'
+                    : 'apparecchi sono privi'}{' '}
                   della foto della targa dati.
                 </span>
               </div>
@@ -417,7 +421,7 @@ export default function AziendaDetail({ aziendaId, onBack }) {
 
             {sorted.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-gray-500">
-                Nessuna utenza. Usa il pulsante “+ Utenza”.
+                Nessun apparecchio. Usa il pulsante “+ Apparecchio”.
               </p>
             ) : (
               <div className="mt-1">
@@ -432,6 +436,15 @@ export default function AziendaDetail({ aziendaId, onBack }) {
                 ))}
               </div>
             )}
+          </section>
+        ) : null}
+
+        {tab === 'automezzi' ? (
+          <section className="rounded-2xl bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-base font-bold text-atlas-dark">
+              Automezzi aziendali
+            </h2>
+            <AutomezziSection aziendaId={aziendaId} />
           </section>
         ) : null}
 
@@ -475,7 +488,7 @@ export default function AziendaDetail({ aziendaId, onBack }) {
               >
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              Utenza
+              Apparecchio
             </button>
           </div>
         </div>

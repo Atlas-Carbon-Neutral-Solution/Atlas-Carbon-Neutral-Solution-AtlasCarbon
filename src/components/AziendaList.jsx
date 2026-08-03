@@ -45,7 +45,7 @@ function AziendaCard({ azienda, stats, onOpen, onDelete }) {
         <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
           <span className="text-gray-600">
             <strong className="text-atlas-dark">{stats.count}</strong>{' '}
-            {stats.count === 1 ? 'utenza' : 'utenze'}
+            {stats.count === 1 ? 'apparecchio' : 'apparecchi'}
           </span>
           <span className="text-gray-600">
             <strong className="text-atlas-green">{formatKWh(stats.ee)}</strong>
@@ -267,7 +267,7 @@ export default function AziendaList({ onOpenAzienda }) {
       <ConfirmDialog
         open={!!toDelete}
         title="Eliminare il sito?"
-        message={`Verranno eliminate anche tutte le utenze, i consumi, le bollette e le foto di "${
+        message={`Verranno eliminati anche tutti gli apparecchi, gli automezzi, i consumi, le bollette e le foto di "${
           toDelete?.ragioneSociale || 'azienda'
         }". Operazione non reversibile.`}
         confirmLabel="Elimina"

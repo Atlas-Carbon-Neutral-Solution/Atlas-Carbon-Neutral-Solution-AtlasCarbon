@@ -16,7 +16,8 @@ function triggerDownload(blob, filename) {
 
 // Esporta l'intero database in un file JSON (foto in base64).
 export async function exportBackup() {
-  const { aziende, utenze, vettori, bollette, photos } = await getAllData()
+  const { aziende, utenze, automezzi, vettori, bollette, photos } =
+    await getAllData()
   const photosB64 = await Promise.all(
     photos.map(async (p) => ({
       id: p.id,
@@ -33,6 +34,7 @@ export async function exportBackup() {
     exportedAt: new Date().toISOString(),
     aziende,
     utenze,
+    automezzi,
     vettori,
     bollette,
     photos: photosB64,
@@ -67,6 +69,7 @@ async function parseBackup(text) {
   return {
     aziende: data.aziende || [],
     utenze: data.utenze || [],
+    automezzi: data.automezzi || [],
     vettori: data.vettori || [],
     bollette: data.bollette || [],
     photos,
