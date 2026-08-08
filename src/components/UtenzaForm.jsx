@@ -67,7 +67,7 @@ export default function UtenzaForm({ initial, isNew, onClose }) {
       <Header
         saveState={saveState}
         onBack={handleBack}
-        subtitle={isNew ? 'Nuova utenza' : 'Modifica utenza'}
+        subtitle={isNew ? 'Nuovo apparecchio' : 'Modifica apparecchio'}
       />
 
       <main className="mx-auto max-w-3xl px-3 py-4 pb-28">
@@ -75,7 +75,7 @@ export default function UtenzaForm({ initial, isNew, onClose }) {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <TextField
-                label="Denominazione utenza"
+                label="Denominazione apparecchio"
                 value={utenza.denominazione}
                 onChange={(v) => update({ denominazione: v })}
                 placeholder="Es. Compressore aria sala 2"
@@ -225,7 +225,7 @@ export default function UtenzaForm({ initial, isNew, onClose }) {
             className="btn-danger mt-4 w-full"
             onClick={() => setConfirmDelete(true)}
           >
-            Elimina utenza
+            Elimina apparecchio
           </button>
         ) : null}
       </main>
@@ -243,7 +243,7 @@ export default function UtenzaForm({ initial, isNew, onClose }) {
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Eliminare l'utenza?"
+        title="Eliminare l'apparecchio?"
         message="Verranno eliminate anche le foto associate. Operazione non reversibile."
         confirmLabel="Elimina"
         danger

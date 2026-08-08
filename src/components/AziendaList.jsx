@@ -17,6 +17,9 @@ import {
   formatTep,
 } from '../utils/calc'
 import { exportBackup, importBackup } from '../utils/backup'
+import { useStorageStatus } from '../hooks/useStorageStatus'
+import StorageBanner from './StorageBanner'
+import { useCloud } from '../cloud/CloudProvider'
 
 function AziendaCard({ azienda, stats, onOpen, onDelete }) {
   return (
@@ -45,7 +48,7 @@ function AziendaCard({ azienda, stats, onOpen, onDelete }) {
         <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
           <span className="text-gray-600">
             <strong className="text-atlas-dark">{stats.count}</strong>{' '}
-            {stats.count === 1 ? 'utenza' : 'utenze'}
+            {stats.count === 1 ? 'apparecchio' : 'apparecchi'}
           </span>
           <span className="text-gray-600">
             <strong className="text-atlas-green">{formatKWh(stats.ee)}</strong>
@@ -76,7 +79,7 @@ function AziendaCard({ azienda, stats, onOpen, onDelete }) {
   )
 }
 
-export default function AziendaList({ onOpenAzienda }) {
+export default function AziendaList({ onOpenAzienda, onOpenCloud }) {
   const [aziende, setAziende] = useState([])
   const [stats, setStats] = useState({})
   const [loading, setLoading] = useState(true)
@@ -84,6 +87,8 @@ export default function AziendaList({ onOpenAzienda }) {
   const [importFile, setImportFile] = useState(null)
   const [banner, setBanner] = useState(null)
   const importInput = useRef(null)
+  const storage = useStorageStatus()
+  const cloud = useCloud()
 
   async function refresh() {
     const list = await getAziende()
@@ -111,6 +116,12 @@ export default function AziendaList({ onOpenAzienda }) {
   useEffect(() => {
     refresh()
   }, [])
+
+  // Dopo una sincronizzazione cloud riuscita, ricarica l'elenco.
+  useEffect(() => {
+    if (cloud.lastSync && !cloud.lastSync.error) refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloud.lastSync?.at])
 
   async function createAzienda() {
     const a = emptyAzienda(newId())
@@ -170,6 +181,7 @@ export default function AziendaList({ onOpenAzienda }) {
       <Header saveState="idle" />
 
       <main className="mx-auto max-w-3xl px-3 py-4 pb-28">
+        <StorageBanner status={storage} />
         {banner ? (
           <div
             className={`mb-3 rounded-lg px-3 py-2 text-sm font-semibold ${
@@ -212,6 +224,52 @@ export default function AziendaList({ onOpenAzienda }) {
         )}
 
         <section className="mt-6 rounded-2xl bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-atlas-dark">
+              Sincronizzazione cloud
+            </h2>
+            <span
+              className={`badge ${
+                cloud.user
+                  ? 'bg-atlas-light/30 text-atlas-dark'
+                  : cloud.configured
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {cloud.user
+                ? cloud.syncing
+                  ? 'Sincronizzo…'
+                  : 'Connesso'
+                : cloud.configured
+                  ? 'Login richiesto'
+                  : 'Non configurato'}
+            </span>
+          </div>
+          <p className="mb-3 mt-1 text-xs text-gray-500">
+            {cloud.user
+              ? `Dati condivisi via Supabase (${cloud.user.email}).`
+              : 'Collega un database Supabase per condividere i rilievi tra più dispositivi e tecnici. L’app resta comunque utilizzabile offline.'}
+            {cloud.lastSync && !cloud.lastSync.error
+              ? ` Ultima sincro: ${cloud.lastSync.pulled} scaricati, ${cloud.lastSync.pushed} inviati.`
+              : ''}
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" className="btn-secondary" onClick={onOpenCloud}>
+              {cloud.configured ? 'Gestisci cloud' : 'Configura cloud'}
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!cloud.user || cloud.syncing}
+              onClick={() => cloud.sync().catch(() => {})}
+            >
+              {cloud.syncing ? 'Sincronizzo…' : 'Sincronizza ora'}
+            </button>
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
           <h2 className="mb-1 text-base font-bold text-atlas-dark">
             Backup e trasferimento dati
           </h2>
@@ -267,7 +325,7 @@ export default function AziendaList({ onOpenAzienda }) {
       <ConfirmDialog
         open={!!toDelete}
         title="Eliminare il sito?"
-        message={`Verranno eliminate anche tutte le utenze, i consumi, le bollette e le foto di "${
+        message={`Verranno eliminati anche tutti gli apparecchi, gli automezzi, i consumi, le bollette e le foto di "${
           toDelete?.ragioneSociale || 'azienda'
         }". Operazione non reversibile.`}
         confirmLabel="Elimina"

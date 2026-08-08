@@ -34,13 +34,17 @@ Monitorate, Consumi per vettore, Bollette):
 - **Azienda / Sito** (livello principale): ragione sociale, indirizzo,
   P.IVA, codice ATECO, settore, anno di riferimento, superficie, prezzi dei
   vettori energetici (€/kWh, €/Smc, €/litro), note.
-  - **Utenza monitorata** (child): denominazione, area (attività
+  - **Apparecchio** (child): denominazione, area (attività
     principali / servizi ausiliari / servizi generali), categoria, tipologia
     (elettrica/termica), marca, modello, **potenza nominale kW**, quantità,
     **fattore di carico**, **rendimento**, ore/giorno, giorni/anno, **tipo di
     misura** (continuo/spot/calcolo), ubicazione, stato, note.
     - **Foto** (child): blob immagine, tipo (targa dati / contesto),
       timestamp.
+  - **Automezzo** (child): identificativo/targa, tipo mezzo (pala,
+    escavatore, autocarro, dumper, muletto, macchina operatrice…),
+    alimentazione (gasolio/benzina/GPL/metano/elettrico), consumo annuo,
+    km/anno, fattore di conversione in **tep**, prezzo unitario.
   - **Vettore / Consumo** (child): vettore energetico, valore, u.m., fattore
     di conversione in **tep**, prezzo unitario. Consumo in tep e costo €
     calcolati automaticamente.
@@ -53,33 +57,70 @@ Monitorate, Consumi per vettore, Bollette):
 1. **Elenco siti** in home con card (ragione sociale, indirizzo, ATECO,
    n° utenze, consumo elettrico stimato e tep totale) + creazione / modifica /
    eliminazione.
-2. **Dettaglio azienda** a schede: **Anagrafica**, **Utenze**, **Consumi**
-   (vettori), **Bollette**. Riepilogo in testa con n° utenze, consumo
-   elettrico stimato e tep totali.
-3. **Utenze monitorate**: tabella ordinabile per consumo stimato, con totale
-   e percentuale di ciascuna utenza. Consumo annuo calcolato:
+2. **Dettaglio azienda** a schede: **Anagrafica**, **Apparecchi**,
+   **Automezzi**, **Consumi** (vettori), **Bollette**. Riepilogo in testa con
+   n° apparecchi, consumo elettrico stimato e tep totali.
+3. **Apparecchi**: tabella ordinabile per consumo stimato, con totale
+   e percentuale di ciascun apparecchio. Consumo annuo calcolato:
    `kWh/anno = potenza × quantità × fattore di carico × ore/giorno ×
    giorni/anno`.
-4. **Form utenza** con sezione foto: `capture="environment"` per la
+4. **Automezzi aziendali**: mezzi a carburante/elettrici con consumo annuo,
+   conversione in **tep** e costo.
+5. **Form apparecchio** con sezione foto: `capture="environment"` per la
    fotocamera, upload multiplo, anteprime a griglia, eliminazione singola.
    Immagini **compresse lato client** (max 1600px, JPEG q=0.8).
-5. **Vettori energetici**: consumi annui per vettore con **conversione
+6. **Vettori energetici**: consumi annui per vettore con **conversione
    automatica in tep** e valorizzazione economica.
-6. **Bollette elettriche mensili** con dettaglio fasce F1/F2/F3, reattiva,
+7. **Bollette elettriche mensili** con dettaglio fasce F1/F2/F3, reattiva,
    costi e €/kWh medio.
-7. **Export per azienda**: file `.xlsx` con fogli *Azienda*, *Utenze*,
-   *Vettori*, *Bollette* + archivio `.zip` con le foto rinominate
+8. **Export per azienda**: file `.xlsx` con fogli *Azienda*, *Apparecchi*,
+   *Automezzi*, *Vettori*, *Bollette* + archivio `.zip` con le foto rinominate
    `[Denominazione]_[targa|contesto]_[n].jpg`.
-8. **Backup**: export/import dell'intero database in **JSON** (foto in
+9. **Backup**: export/import dell'intero database in **JSON** (foto in
    base64), in modalità *unisci* o *sostituisci*.
-9. **Validazioni** (potenza > 0, quantità ≥ 1, fattore di carico e rendimento
-   0–1, ore/giorno ≤ 24, giorni/anno ≤ 365) e avviso **non bloccante** se
-   un'utenza è priva della foto della targa dati.
+10. **Validazioni** (potenza > 0, quantità ≥ 1, fattore di carico e rendimento
+    0–1, ore/giorno ≤ 24, giorni/anno ≤ 365) e avviso **non bloccante** se
+    un apparecchio è privo della foto della targa dati.
+
+## Sincronizzazione cloud (Supabase) — opzionale
+
+L'app è **offline-first**: i dati vivono in locale (IndexedDB) e funzionano
+senza rete. È possibile collegare un database **Supabase** per **condividere i
+rilievi tra più dispositivi/tecnici**, con **login email/password** e **RLS**
+(accesso ai soli utenti autenticati).
+
+Setup:
+
+1. Crea un progetto su [supabase.com](https://supabase.com) (piano gratuito).
+2. Nel **SQL Editor** esegui lo schema in [`supabase/schema.sql`](supabase/schema.sql)
+   (tabella `records` + policy RLS).
+3. Crea gli account dei tecnici in *Authentication > Users* (o abilita le
+   registrazioni email e usa "Registrati" dall'app).
+4. Nell'app: **Sincronizzazione cloud → Configura cloud**, incolla **URL
+   progetto** e **anon key**, poi **Accedi**.
+
+La sincronizzazione è **bidirezionale** (last-write-wins su `updated_at`), con
+**tombstone** per propagare le eliminazioni; le foto viaggiano come base64.
+Avviene automaticamente all'accesso e al ritorno online, oppure con
+**"Sincronizza ora"**. Il login abilita solo la sincronizzazione: l'uso locale
+resta sempre disponibile, anche offline.
+
+## Build artefatto (single-file)
+
+`npm run build:artifact` produce `dist-artifact/atlas-app.html`, una singola
+pagina autonoma (CSS/JS inline, senza service worker, con fallback storage in
+memoria) pubblicabile come Artifact.
 
 ## Note d'uso
 
 - **Salvataggio automatico** a ogni modifica; stato ("Salvo…"/"Salvato")
   visibile nell'intestazione.
+- **Persistenza locale**: i dati sono salvati sul dispositivo in IndexedDB e
+  l'app richiede l'**archiviazione permanente** (`navigator.storage.persist`)
+  per evitarne l'eliminazione automatica. In home un indicatore mostra lo
+  stato dell'archiviazione; se l'ambiente non consente lo storage persistente
+  (es. anteprima in iframe sandbox) l'app resta usabile ma avvisa che i dati
+  non vengono salvati.
 - Per installare l'app sul telefono: "Aggiungi a schermata Home".
-- I dati risiedono solo sul dispositivo: usare il **backup** per non
-  perderli.
+- I dati risiedono solo sul dispositivo: usare il **backup** (JSON) per
+  trasferirli su un altro dispositivo e non perderli.

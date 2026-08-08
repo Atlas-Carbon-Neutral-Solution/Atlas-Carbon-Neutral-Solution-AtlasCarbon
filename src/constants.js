@@ -41,6 +41,33 @@ export const TIPI_FOTO = [
   { value: 'contesto', label: 'Contesto' },
 ]
 
+// Automezzi aziendali (rif. rilievo consumi carburante per mezzo).
+export const TIPI_MEZZO = [
+  { value: 'pala', label: 'Pala meccanica' },
+  { value: 'escavatore', label: 'Escavatore' },
+  { value: 'autocarro', label: 'Autocarro / bilico / motrice' },
+  { value: 'dumper', label: 'Dumper' },
+  { value: 'muletto', label: 'Muletto / carrello elevatore' },
+  { value: 'operatrice', label: 'Macchina operatrice' },
+  { value: 'attrezzatura', label: 'Attrezzatura' },
+  { value: 'autovettura', label: 'Autovettura / furgone' },
+  { value: 'altro', label: 'Altro mezzo' },
+]
+
+// Alimentazioni con unità di misura e fattore di conversione in tep
+// (approssimato, modificabile a livello di singolo mezzo).
+export const ALIMENTAZIONI = [
+  { value: 'gasolio', label: 'Gasolio', um: 'litri', fattoreTep: 0.00085 },
+  { value: 'benzina', label: 'Benzina', um: 'litri', fattoreTep: 0.00078 },
+  { value: 'gpl', label: 'GPL', um: 'litri', fattoreTep: 0.0006 },
+  { value: 'metano', label: 'Metano', um: 'kg', fattoreTep: 0.00116 },
+  { value: 'elettrico', label: 'Elettrico', um: 'kWh', fattoreTep: 0.000187 },
+]
+
+export function alimentazioneDef(code) {
+  return ALIMENTAZIONI.find((a) => a.value === code) || ALIMENTAZIONI[0]
+}
+
 // Mesi (per le bollette).
 export const MESI = [
   { value: 1, label: 'Gennaio' },
@@ -123,6 +150,23 @@ export function emptyUtenza(id, aziendaId) {
     tipoMisura: 'calcolo',
     ubicazione: '',
     stato: 'buono',
+    note: '',
+  }
+}
+
+export function emptyAutomezzo(id, aziendaId) {
+  const def = ALIMENTAZIONI[0]
+  return {
+    id,
+    aziendaId,
+    identificativo: '',
+    tipoMezzo: 'pala',
+    alimentazione: def.value,
+    um: def.um,
+    consumo: '',
+    fattoreTep: String(def.fattoreTep),
+    prezzoUnitario: '',
+    kmAnno: '',
     note: '',
   }
 }

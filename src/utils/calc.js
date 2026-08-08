@@ -1,4 +1,4 @@
-import { vettoreDef } from '../constants'
+import { vettoreDef, alimentazioneDef } from '../constants'
 
 // Consumo elettrico/termico stimato annuo di un'utenza monitorata.
 // kWh/anno = potenza kW × quantità × fattore di carico × ore/giorno × giorni/anno
@@ -47,6 +47,30 @@ export function tepTotale(vettori) {
 
 export function costoTotaleVettori(vettori) {
   return (vettori || []).reduce((s, v) => s + vettoreCosto(v), 0)
+}
+
+// tep di un automezzo = consumo × fattore di conversione
+export function automezzoTep(m) {
+  if (!m) return 0
+  const consumo = Number(m.consumo) || 0
+  const f = Number(m.fattoreTep)
+  const fattore = Number.isFinite(f) ? f : alimentazioneDef(m.alimentazione).fattoreTep
+  return consumo * fattore
+}
+
+export function automezzoCosto(m) {
+  if (!m) return 0
+  const consumo = Number(m.consumo) || 0
+  const prezzo = Number(m.prezzoUnitario) || 0
+  return consumo * prezzo
+}
+
+export function tepTotaleAutomezzi(automezzi) {
+  return (automezzi || []).reduce((s, m) => s + automezzoTep(m), 0)
+}
+
+export function costoTotaleAutomezzi(automezzi) {
+  return (automezzi || []).reduce((s, m) => s + automezzoCosto(m), 0)
 }
 
 // €/kWh medio di una bolletta (costo netto / energia attiva totale)
