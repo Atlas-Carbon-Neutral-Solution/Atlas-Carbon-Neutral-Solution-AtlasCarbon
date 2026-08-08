@@ -1,7 +1,7 @@
 import { openDB } from 'idb'
 
 const DB_NAME = 'atlas-diagnosi'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 export const STORES = {
   aziende: 'aziende',
@@ -11,6 +11,22 @@ export const STORES = {
   bollette: 'bollette',
   photos: 'photos',
 }
+
+// Store separato per le tombstone (id eliminati) usate dalla sincronizzazione.
+const DELETIONS_STORE = 'deletions'
+
+// Mappa "kind" (usato nel cloud) <-> object store locale.
+export const KIND_STORE = {
+  azienda: STORES.aziende,
+  utenza: STORES.utenze,
+  automezzo: STORES.automezzi,
+  vettore: STORES.vettori,
+  bolletta: STORES.bollette,
+  photo: STORES.photos,
+}
+export const STORE_KIND = Object.fromEntries(
+  Object.entries(KIND_STORE).map(([k, v]) => [v, k]),
+)
 
 let dbPromise = null
 
@@ -29,6 +45,9 @@ const upgrade = (db) => {
       const s = db.createObjectStore(store, { keyPath: 'id' })
       s.createIndex(index, index, { unique: false })
     }
+  }
+  if (!db.objectStoreNames.contains(DELETIONS_STORE)) {
+    db.createObjectStore(DELETIONS_STORE, { keyPath: 'id' })
   }
 }
 
@@ -78,6 +97,47 @@ export function newId() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Helper generici e tombstone (per la sincronizzazione cloud)        */
+/* ------------------------------------------------------------------ */
+
+export async function getStoreRecords(store) {
+  const db = await getDB()
+  return db.getAll(store)
+}
+
+export async function getRecord(store, id) {
+  const db = await getDB()
+  return db.get(store, id)
+}
+
+// Scrive un record "grezzo" senza toccare updatedAt (usato dal pull cloud).
+export async function putRaw(store, record) {
+  const db = await getDB()
+  await db.put(store, record)
+}
+
+export async function deleteRaw(store, id) {
+  const db = await getDB()
+  await db.delete(store, id)
+}
+
+// Registra una tombstone per un id eliminato (kind = tipo record).
+export async function recordDeletion(kind, id) {
+  const db = await getDB()
+  await db.put(DELETIONS_STORE, { id, kind, deletedAt: Date.now() })
+}
+
+export async function getDeletions() {
+  const db = await getDB()
+  return db.getAll(DELETIONS_STORE)
+}
+
+export async function clearDeletion(id) {
+  const db = await getDB()
+  await db.delete(DELETIONS_STORE, id)
+}
+
+/* ------------------------------------------------------------------ */
 /* Aziende / Siti                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -103,6 +163,7 @@ export async function putAzienda(azienda) {
 export async function deleteAzienda(id) {
   const db = await getDB()
   const utenze = await db.getAllFromIndex(STORES.utenze, 'aziendaId', id)
+  const tombstones = [] // { kind, id }
   const tx = db.transaction(
     [
       STORES.aziende,
@@ -119,18 +180,27 @@ export async function deleteAzienda(id) {
       .objectStore(STORES.photos)
       .index('utenzaId')
       .getAllKeys(u.id)
-    for (const pid of photoKeys) await tx.objectStore(STORES.photos).delete(pid)
+    for (const pid of photoKeys) {
+      await tx.objectStore(STORES.photos).delete(pid)
+      tombstones.push({ kind: 'photo', id: pid })
+    }
     await tx.objectStore(STORES.utenze).delete(u.id)
+    tombstones.push({ kind: 'utenza', id: u.id })
   }
   for (const store of [STORES.automezzi, STORES.vettori, STORES.bollette]) {
     const keys = await tx
       .objectStore(store)
       .index('aziendaId')
       .getAllKeys(id)
-    for (const k of keys) await tx.objectStore(store).delete(k)
+    for (const k of keys) {
+      await tx.objectStore(store).delete(k)
+      tombstones.push({ kind: STORE_KIND[store], id: k })
+    }
   }
   await tx.objectStore(STORES.aziende).delete(id)
   await tx.done
+  tombstones.push({ kind: 'azienda', id })
+  for (const t of tombstones) await recordDeletion(t.kind, t.id)
 }
 
 /* ------------------------------------------------------------------ */
@@ -158,9 +228,15 @@ export async function deleteUtenza(id) {
     .objectStore(STORES.photos)
     .index('utenzaId')
     .getAllKeys(id)
-  for (const pid of photoKeys) await tx.objectStore(STORES.photos).delete(pid)
+  const deletedPhotos = []
+  for (const pid of photoKeys) {
+    await tx.objectStore(STORES.photos).delete(pid)
+    deletedPhotos.push(pid)
+  }
   await tx.objectStore(STORES.utenze).delete(id)
   await tx.done
+  for (const pid of deletedPhotos) await recordDeletion('photo', pid)
+  await recordDeletion('utenza', id)
 }
 
 /* ------------------------------------------------------------------ */
@@ -184,6 +260,7 @@ export async function putAutomezzo(automezzo) {
 export async function deleteAutomezzo(id) {
   const db = await getDB()
   await db.delete(STORES.automezzi, id)
+  await recordDeletion('automezzo', id)
 }
 
 /* ------------------------------------------------------------------ */
@@ -207,6 +284,7 @@ export async function putVettore(vettore) {
 export async function deleteVettore(id) {
   const db = await getDB()
   await db.delete(STORES.vettori, id)
+  await recordDeletion('vettore', id)
 }
 
 /* ------------------------------------------------------------------ */
@@ -233,6 +311,7 @@ export async function putBolletta(bolletta) {
 export async function deleteBolletta(id) {
   const db = await getDB()
   await db.delete(STORES.bollette, id)
+  await recordDeletion('bolletta', id)
 }
 
 /* ------------------------------------------------------------------ */
@@ -254,6 +333,7 @@ export async function putPhoto(photo) {
 export async function deletePhoto(id) {
   const db = await getDB()
   await db.delete(STORES.photos, id)
+  await recordDeletion('photo', id)
 }
 
 /* ------------------------------------------------------------------ */

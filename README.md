@@ -82,6 +82,29 @@ Monitorate, Consumi per vettore, Bollette):
     0–1, ore/giorno ≤ 24, giorni/anno ≤ 365) e avviso **non bloccante** se
     un apparecchio è privo della foto della targa dati.
 
+## Sincronizzazione cloud (Supabase) — opzionale
+
+L'app è **offline-first**: i dati vivono in locale (IndexedDB) e funzionano
+senza rete. È possibile collegare un database **Supabase** per **condividere i
+rilievi tra più dispositivi/tecnici**, con **login email/password** e **RLS**
+(accesso ai soli utenti autenticati).
+
+Setup:
+
+1. Crea un progetto su [supabase.com](https://supabase.com) (piano gratuito).
+2. Nel **SQL Editor** esegui lo schema in [`supabase/schema.sql`](supabase/schema.sql)
+   (tabella `records` + policy RLS).
+3. Crea gli account dei tecnici in *Authentication > Users* (o abilita le
+   registrazioni email e usa "Registrati" dall'app).
+4. Nell'app: **Sincronizzazione cloud → Configura cloud**, incolla **URL
+   progetto** e **anon key**, poi **Accedi**.
+
+La sincronizzazione è **bidirezionale** (last-write-wins su `updated_at`), con
+**tombstone** per propagare le eliminazioni; le foto viaggiano come base64.
+Avviene automaticamente all'accesso e al ritorno online, oppure con
+**"Sincronizza ora"**. Il login abilita solo la sincronizzazione: l'uso locale
+resta sempre disponibile, anche offline.
+
 ## Build artefatto (single-file)
 
 `npm run build:artifact` produce `dist-artifact/atlas-app.html`, una singola
