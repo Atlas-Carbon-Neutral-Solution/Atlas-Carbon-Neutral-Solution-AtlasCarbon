@@ -92,6 +92,12 @@ memoria) pubblicabile come Artifact.
 
 - **Salvataggio automatico** a ogni modifica; stato ("Salvo…"/"Salvato")
   visibile nell'intestazione.
+- **Persistenza locale**: i dati sono salvati sul dispositivo in IndexedDB e
+  l'app richiede l'**archiviazione permanente** (`navigator.storage.persist`)
+  per evitarne l'eliminazione automatica. In home un indicatore mostra lo
+  stato dell'archiviazione; se l'ambiente non consente lo storage persistente
+  (es. anteprima in iframe sandbox) l'app resta usabile ma avvisa che i dati
+  non vengono salvati.
 - Per installare l'app sul telefono: "Aggiungi a schermata Home".
-- I dati risiedono solo sul dispositivo: usare il **backup** per non
-  perderli.
+- I dati risiedono solo sul dispositivo: usare il **backup** (JSON) per
+  trasferirli su un altro dispositivo e non perderli.

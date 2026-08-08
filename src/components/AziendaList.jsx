@@ -17,6 +17,8 @@ import {
   formatTep,
 } from '../utils/calc'
 import { exportBackup, importBackup } from '../utils/backup'
+import { useStorageStatus } from '../hooks/useStorageStatus'
+import StorageBanner from './StorageBanner'
 
 function AziendaCard({ azienda, stats, onOpen, onDelete }) {
   return (
@@ -84,6 +86,7 @@ export default function AziendaList({ onOpenAzienda }) {
   const [importFile, setImportFile] = useState(null)
   const [banner, setBanner] = useState(null)
   const importInput = useRef(null)
+  const storage = useStorageStatus()
 
   async function refresh() {
     const list = await getAziende()
@@ -170,6 +173,7 @@ export default function AziendaList({ onOpenAzienda }) {
       <Header saveState="idle" />
 
       <main className="mx-auto max-w-3xl px-3 py-4 pb-28">
+        <StorageBanner status={storage} />
         {banner ? (
           <div
             className={`mb-3 rounded-lg px-3 py-2 text-sm font-semibold ${

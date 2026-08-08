@@ -32,14 +32,27 @@ const upgrade = (db) => {
   }
 }
 
+// Modalità di archiviazione effettiva:
+// - 'indexeddb': dati salvati in modo persistente sul dispositivo
+// - 'memory': IndexedDB non disponibile (es. iframe sandbox) -> archivio
+//   volatile in memoria, i dati NON vengono salvati.
+const storageState = { mode: 'unknown' }
+
+export function getStorageMode() {
+  return storageState.mode
+}
+
 async function openDatabase() {
   try {
-    return await openDB(DB_NAME, DB_VERSION, { upgrade })
+    const db = await openDB(DB_NAME, DB_VERSION, { upgrade })
+    storageState.mode = 'indexeddb'
+    return db
   } catch (e) {
-    // IndexedDB non disponibile (es. iframe con storage bloccato):
-    // fallback in memoria, così l'app resta comunque utilizzabile.
+    // IndexedDB non disponibile: fallback in memoria, così l'app resta
+    // comunque utilizzabile (ma i dati non persistono).
     console.warn('IndexedDB non disponibile, uso archivio in memoria.', e)
     await import('fake-indexeddb/auto')
+    storageState.mode = 'memory'
     return openDB(DB_NAME, DB_VERSION, { upgrade })
   }
 }
@@ -49,6 +62,12 @@ function getDB() {
     dbPromise = openDatabase()
   }
   return dbPromise
+}
+
+// Forza l'apertura del DB e ritorna la modalità di archiviazione effettiva.
+export async function initDB() {
+  await getDB()
+  return storageState.mode
 }
 
 export function newId() {
